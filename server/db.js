@@ -35,9 +35,24 @@ export const run = (sql, params = []) => {
 
 // Initialize schema and seed sample data
 export const initDatabase = async () => {
-  const createTableSql = `
+  // 1. Create Users Table
+  const createUsersSql = `
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    );
+  `;
+  await run(createUsersSql);
+  console.log('📋 Database table `users` verified.');
+
+  // 2. Create Subscriptions Table with userId
+  const createSubsSql = `
     CREATE TABLE IF NOT EXISTS subscriptions (
       id TEXT PRIMARY KEY,
+      userId TEXT,
       name TEXT NOT NULL,
       category TEXT NOT NULL,
       amount REAL NOT NULL,
@@ -50,43 +65,23 @@ export const initDatabase = async () => {
       reminderDays INTEGER DEFAULT 3,
       notes TEXT,
       color TEXT,
-      createdAt TEXT
+      createdAt TEXT,
+      FOREIGN KEY(userId) REFERENCES users(id)
     );
   `;
-
-  await run(createTableSql);
+  await run(createSubsSql);
   console.log('📋 Database table `subscriptions` verified.');
 
-  // Check if empty and seed initial subscriptions
-  const existing = await query('SELECT COUNT(*) as count FROM subscriptions');
-  if (existing[0].count === 0) {
-    console.log('🌱 Seeding sample subscriptions into SQLite database...');
-    
-    const getOffsetDate = (days) => {
-      const d = new Date();
-      d.setDate(d.getDate() + days);
-      return d.toISOString().split('T')[0];
-    };
-
-    const seeds = [
-      ['sub-1', 'ChatGPT Plus', 'productivity', 20.00, 'USD', 'monthly', getOffsetDate(2), 1, 'active', 'Credit Card (Visa)', 3, 'Used daily for coding assistant and research.', '#059669', getOffsetDate(-60)],
-      ['sub-2', 'Netflix 4K Ultra HD', 'entertainment', 22.99, 'USD', 'monthly', getOffsetDate(5), 1, 'active', 'PayPal', 3, 'Shared family subscription account.', '#10B981', getOffsetDate(-120)],
-      ['sub-3', 'GitHub Copilot', 'productivity', 100.00, 'USD', 'yearly', getOffsetDate(18), 1, 'active', 'Credit Card (Mastercard)', 7, 'Annual subscription saves $20/yr.', '#047857', getOffsetDate(-340)],
-      ['sub-4', 'Spotify Premium Duo', 'entertainment', 14.99, 'USD', 'monthly', getOffsetDate(-1), 0, 'active', 'Apple Pay', 3, 'Check card balance before renewal.', '#16A34A', getOffsetDate(-180)],
-      ['sub-5', 'iCloud+ 200GB Storage', 'utilities', 2.99, 'USD', 'monthly', getOffsetDate(12), 1, 'active', 'Apple Pay', 1, 'Backups for iPhone and Photos.', '#0284C7', getOffsetDate(-200)],
-      ['sub-6', 'Equinox Gym & Wellness', 'fitness', 65.00, 'USD', 'monthly', getOffsetDate(24), 1, 'active', 'Debit Card', 5, 'Includes swimming pool & sauna access.', '#059669', getOffsetDate(-90)]
-    ];
-
-    const insertSql = `
-      INSERT INTO subscriptions 
-      (id, name, category, amount, currency, billingCycle, nextBillingDate, autoRenew, status, paymentMethod, reminderDays, notes, color, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    for (const seed of seeds) {
-      await run(insertSql, seed);
+  // Check if userId column exists in older subscriptions table
+  try {
+    const tableInfo = await query("PRAGMA table_info(subscriptions)");
+    const hasUserId = tableInfo.some(col => col.name === 'userId');
+    if (!hasUserId) {
+      console.log('🔄 Adding missing `userId` column to subscriptions table...');
+      await run("ALTER TABLE subscriptions ADD COLUMN userId TEXT");
     }
-    console.log('✅ Seeding complete. 6 subscriptions inserted.');
+  } catch (e) {
+    console.error('Migration note:', e.message);
   }
 };
 

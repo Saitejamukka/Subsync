@@ -1,13 +1,72 @@
 import { getInitialSubscriptions, saveSubscriptions } from '../utils/storage';
 
-const API_BASE = '/api/subscriptions';
+const API_BASE = '/api';
+const TOKEN_KEY = 'subsync_jwt_token';
 
-export const fetchSubscriptions = async () => {
+export const getAuthToken = () => localStorage.getItem(TOKEN_KEY);
+export const setAuthToken = (token) => localStorage.setItem(TOKEN_KEY, token);
+export const removeAuthToken = () => localStorage.removeItem(TOKEN_KEY);
+
+const getAuthHeaders = () => {
+  const token = getAuthToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+};
+
+// 1. Auth Services
+export const registerUser = async (name, email, password) => {
+  const res = await fetch(`${API_BASE}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, email, password })
+  });
+  const data = await res.json();
+  if (data.token) {
+    setAuthToken(data.token);
+  }
+  return data;
+};
+
+export const loginUser = async (email, password) => {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+  const data = await res.json();
+  if (data.token) {
+    setAuthToken(data.token);
+  }
+  return data;
+};
+
+export const fetchCurrentUser = async () => {
+  const token = getAuthToken();
+  if (!token) return null;
   try {
-    const res = await fetch(API_BASE);
+    const res = await fetch(`${API_BASE}/auth/me`, { headers: getAuthHeaders() });
     if (res.ok) {
       const data = await res.json();
-      // Sync local storage copy
+      return data.user;
+    }
+  } catch (e) {
+    console.warn('Failed to validate session token', e);
+  }
+  return null;
+};
+
+export const logoutUser = () => {
+  removeAuthToken();
+};
+
+// 2. Subscriptions API Services
+export const fetchSubscriptions = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/subscriptions`, { headers: getAuthHeaders() });
+    if (res.ok) {
+      const data = await res.json();
       saveSubscriptions(data);
       return data;
     }
@@ -19,16 +78,16 @@ export const fetchSubscriptions = async () => {
 
 export const createSubscription = async (subData) => {
   try {
-    const res = await fetch(API_BASE, {
+    const res = await fetch(`${API_BASE}/subscriptions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(subData)
     });
     if (res.ok) {
       return await res.json();
     }
   } catch (e) {
-    console.warn('Backend API error creating subscription. Using LocalStorage fallback.', e);
+    console.warn('Backend API error creating subscription.', e);
   }
   // Fallback
   const newSub = { ...subData, id: `sub-${Date.now()}` };
@@ -40,16 +99,16 @@ export const createSubscription = async (subData) => {
 
 export const updateSubscription = async (id, subData) => {
   try {
-    const res = await fetch(`${API_BASE}/${id}`, {
+    const res = await fetch(`${API_BASE}/subscriptions/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(subData)
     });
     if (res.ok) {
       return await res.json();
     }
   } catch (e) {
-    console.warn('Backend API error updating subscription. Using LocalStorage fallback.', e);
+    console.warn('Backend API error updating subscription.', e);
   }
   // Fallback
   const current = getInitialSubscriptions();
@@ -60,12 +119,15 @@ export const updateSubscription = async (id, subData) => {
 
 export const deleteSubscription = async (id) => {
   try {
-    const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE}/subscriptions/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
     if (res.ok) {
       return true;
     }
   } catch (e) {
-    console.warn('Backend API error deleting subscription. Using LocalStorage fallback.', e);
+    console.warn('Backend API error deleting subscription.', e);
   }
   const current = getInitialSubscriptions();
   const updated = current.filter(s => s.id !== id);
@@ -75,12 +137,15 @@ export const deleteSubscription = async (id) => {
 
 export const markSubscriptionPaid = async (id) => {
   try {
-    const res = await fetch(`${API_BASE}/${id}/mark-paid`, { method: 'POST' });
+    const res = await fetch(`${API_BASE}/subscriptions/${id}/mark-paid`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
     if (res.ok) {
       return await res.json();
     }
   } catch (e) {
-    console.warn('Backend API error marking paid. Using LocalStorage fallback.', e);
+    console.warn('Backend API error marking paid.', e);
   }
   return null;
 };

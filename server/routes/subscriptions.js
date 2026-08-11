@@ -1,14 +1,18 @@
 import express from 'express';
 import { query, run } from '../db.js';
+import { authenticateToken } from '../middleware/auth.js';
 import { checkUpcomingRenewals } from '../scheduler.js';
 
 const router = express.Router();
 
-// 1. GET /api/subscriptions - List all subscriptions
-router.get('/subscriptions', async (req, res) => {
+// Apply auth middleware to all subscription routes
+router.use(authenticateToken);
+
+// 1. GET /api/subscriptions - List subscriptions for logged-in user
+router.get('/', async (req, res) => {
   try {
-    const rows = await query('SELECT * FROM subscriptions ORDER BY nextBillingDate ASC');
-    // Format boolean autoRenew
+    const userId = req.user.id;
+    const rows = await query('SELECT * FROM subscriptions WHERE userId = ? OR userId IS NULL ORDER BY nextBillingDate ASC', [userId]);
     const formatted = rows.map(r => ({
       ...r,
       autoRenew: Boolean(r.autoRenew)
@@ -19,9 +23,10 @@ router.get('/subscriptions', async (req, res) => {
   }
 });
 
-// 2. POST /api/subscriptions - Create new subscription
-router.post('/subscriptions', async (req, res) => {
+// 2. POST /api/subscriptions - Create subscription for logged-in user
+router.post('/', async (req, res) => {
   try {
+    const userId = req.user.id;
     const {
       id,
       name,
@@ -43,12 +48,13 @@ router.post('/subscriptions', async (req, res) => {
 
     const sql = `
       INSERT INTO subscriptions 
-      (id, name, category, amount, currency, billingCycle, nextBillingDate, autoRenew, status, paymentMethod, reminderDays, notes, color, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, userId, name, category, amount, currency, billingCycle, nextBillingDate, autoRenew, status, paymentMethod, reminderDays, notes, color, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     await run(sql, [
       subId,
+      userId,
       name,
       category || 'other',
       parseFloat(amount) || 0,
@@ -71,10 +77,11 @@ router.post('/subscriptions', async (req, res) => {
   }
 });
 
-// 3. PUT /api/subscriptions/:id - Update subscription
-router.put('/subscriptions/:id', async (req, res) => {
+// 3. PUT /api/subscriptions/:id - Update user's subscription
+router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.id;
     const {
       name,
       category,
@@ -95,7 +102,7 @@ router.put('/subscriptions/:id', async (req, res) => {
         name = ?, category = ?, amount = ?, currency = ?, billingCycle = ?,
         nextBillingDate = ?, autoRenew = ?, status = ?, paymentMethod = ?,
         reminderDays = ?, notes = ?, color = ?
-      WHERE id = ?
+      WHERE id = ? AND (userId = ? OR userId IS NULL)
     `;
 
     await run(sql, [
@@ -111,7 +118,8 @@ router.put('/subscriptions/:id', async (req, res) => {
       parseInt(reminderDays),
       notes,
       color,
-      id
+      id,
+      userId
     ]);
 
     const updated = await query('SELECT * FROM subscriptions WHERE id = ?', [id]);
@@ -122,22 +130,24 @@ router.put('/subscriptions/:id', async (req, res) => {
   }
 });
 
-// 4. DELETE /api/subscriptions/:id - Delete subscription
-router.delete('/subscriptions/:id', async (req, res) => {
+// 4. DELETE /api/subscriptions/:id - Delete user's subscription
+router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    await run('DELETE FROM subscriptions WHERE id = ?', [id]);
+    const userId = req.user.id;
+    await run('DELETE FROM subscriptions WHERE id = ? AND (userId = ? OR userId IS NULL)', [id, userId]);
     res.json({ message: 'Subscription deleted successfully', id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// 5. POST /api/subscriptions/:id/mark-paid - Advance next billing date
-router.post('/subscriptions/:id/mark-paid', async (req, res) => {
+// 5. POST /api/subscriptions/:id/mark-paid - Advance renewal date
+router.post('/:id/mark-paid', async (req, res) => {
   try {
     const { id } = req.params;
-    const existing = await query('SELECT * FROM subscriptions WHERE id = ?', [id]);
+    const userId = req.user.id;
+    const existing = await query('SELECT * FROM subscriptions WHERE id = ? AND (userId = ? OR userId IS NULL)', [id, userId]);
     if (existing.length === 0) return res.status(404).json({ error: 'Subscription not found' });
 
     const sub = existing[0];
@@ -154,16 +164,6 @@ router.post('/subscriptions/:id/mark-paid', async (req, res) => {
     const updated = await query('SELECT * FROM subscriptions WHERE id = ?', [id]);
 
     res.json({ ...updated[0], autoRenew: Boolean(updated[0].autoRenew) });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 6. POST /api/reminders/check - Manually trigger renewal check
-router.post('/reminders/check', async (req, res) => {
-  try {
-    const alerts = await checkUpcomingRenewals();
-    res.json({ count: alerts.length, alerts });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

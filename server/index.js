@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initDatabase } from './db.js';
 import { initScheduler, checkUpcomingRenewals } from './scheduler.js';
+import authRoutes from './routes/auth.js';
 import subscriptionRoutes from './routes/subscriptions.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,7 +17,8 @@ app.use(cors());
 app.use(express.json());
 
 // API Routes
-app.use('/api', subscriptionRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 
 // Health Check
 app.get('/api/health', (req, res) => {

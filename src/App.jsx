@@ -12,7 +12,9 @@ import {
   Zap,
   Globe,
   Download,
-  Database
+  User,
+  LogOut,
+  LogIn
 } from 'lucide-react';
 
 // Components
@@ -24,6 +26,7 @@ import InsightsRadar from './components/InsightsRadar';
 import NotificationCenter from './components/NotificationCenter';
 import EmailSimulatorModal from './components/EmailSimulatorModal';
 import ExportImportModal from './components/ExportImportModal';
+import AuthModal from './components/AuthModal';
 
 // Constants & Storage
 import { CATEGORIES, CURRENCIES, SAMPLE_SUBSCRIPTIONS } from './constants';
@@ -43,13 +46,16 @@ import {
   createSubscription, 
   updateSubscription, 
   deleteSubscription, 
-  markSubscriptionPaid 
+  markSubscriptionPaid,
+  fetchCurrentUser,
+  logoutUser
 } from './services/api';
 
 export default function App() {
   const [subscriptions, setSubscriptions] = useState([]);
   const [prefs, setPrefs] = useState(getInitialPrefs);
-  const [isBackendConnected, setIsBackendConnected] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Filters & Search
   const [search, setSearch] = useState('');
@@ -67,11 +73,12 @@ export default function App() {
   const [showAdvancedTools, setShowAdvancedTools] = useState(false);
   const [advancedTab, setAdvancedTab] = useState('analytics');
 
-  // Initial Data Fetching from Express API / SQLite
+  // Initial Data & User Session Fetching
   const loadData = async () => {
+    const user = await fetchCurrentUser();
+    setCurrentUser(user);
     const data = await fetchSubscriptions();
     setSubscriptions(data);
-    setIsBackendConnected(true);
   };
 
   useEffect(() => {
@@ -138,7 +145,6 @@ export default function App() {
     if (updated) {
       loadData();
     } else {
-      // Fallback
       setSubscriptions(prev => prev.map(s => {
         if (s.id === subId) {
           const d = new Date(s.nextBillingDate + 'T00:00:00');
@@ -158,6 +164,12 @@ export default function App() {
     setIsEmailModalOpen(true);
   };
 
+  const handleLogout = () => {
+    logoutUser();
+    setCurrentUser(null);
+    loadData();
+  };
+
   return (
     <div className="app-container">
       {/* Navbar Header */}
@@ -167,17 +179,32 @@ export default function App() {
             <Zap size={24} />
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span className="brand-title">SubSync</span>
-              <span style={{ fontSize: '0.68rem', padding: '0.15rem 0.4rem', background: 'var(--green-badge-bg)', color: 'var(--green-dark)', borderRadius: '4px', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                <Database size={10} /> Express + SQLite
-              </span>
-            </div>
+            <div className="brand-title">SubSync</div>
             <div className="brand-subtitle">Smart Subscription Tracker</div>
           </div>
         </div>
 
         <div className="nav-actions">
+          {/* User Auth Pill / Login Button */}
+          {currentUser ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--green-light)', border: '1px solid var(--border-light)', padding: '0.35rem 0.75rem', borderRadius: '20px', fontSize: '0.85rem' }}>
+              <User size={15} color="var(--green-dark)" />
+              <span style={{ fontWeight: '800', color: 'var(--green-dark)' }}>{currentUser.name}</span>
+              <button 
+                onClick={handleLogout} 
+                style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '0.25rem' }}
+                title="Sign Out"
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
+          ) : (
+            <button className="btn btn-secondary" onClick={() => setIsAuthModalOpen(true)} style={{ padding: '0.45rem 0.85rem' }}>
+              <LogIn size={15} />
+              <span>Sign In</span>
+            </button>
+          )}
+
           {/* Currency Switcher */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <Globe size={16} color="var(--green-dark)" />
@@ -407,6 +434,15 @@ export default function App() {
       </section>
 
       {/* Modals & Drawers */}
+      <AuthModal 
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthSuccess={(user) => {
+          setCurrentUser(user);
+          loadData();
+        }}
+      />
+
       <SubscriptionFormModal 
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
