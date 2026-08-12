@@ -72,6 +72,19 @@ export const initDatabase = async () => {
   await run(createSubsSql);
   console.log('📋 Database table `subscriptions` verified.');
 
+  // 3. Create Password Resets Table
+  const createResetsSql = `
+    CREATE TABLE IF NOT EXISTS password_resets (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      token TEXT NOT NULL,
+      expiresAt TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    );
+  `;
+  await run(createResetsSql);
+  console.log('📋 Database table `password_resets` verified.');
+
   // Check if userId column exists in older subscriptions table
   try {
     const tableInfo = await query("PRAGMA table_info(subscriptions)");

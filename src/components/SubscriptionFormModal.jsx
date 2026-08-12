@@ -23,7 +23,10 @@ export default function SubscriptionFormModal({
     color: '#8B5CF6'
   });
 
+  const [formError, setFormError] = useState('');
+
   useEffect(() => {
+    setFormError('');
     if (editingSubscription) {
       setFormData({
         ...editingSubscription
@@ -50,6 +53,7 @@ export default function SubscriptionFormModal({
   if (!isOpen) return null;
 
   const handleApplyPreset = (preset) => {
+    setFormError('');
     const categoryObj = CATEGORIES.find(c => c.id === preset.category) || CATEGORIES[0];
     setFormData(prev => ({
       ...prev,
@@ -63,11 +67,28 @@ export default function SubscriptionFormModal({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.amount || !formData.nextBillingDate) return;
+    setFormError('');
+
+    if (!formData.name || !formData.name.trim()) {
+      setFormError('Please enter a valid subscription name.');
+      return;
+    }
+
+    const numAmount = parseFloat(formData.amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      setFormError('Please enter a valid subscription amount greater than 0.');
+      return;
+    }
+
+    if (!formData.nextBillingDate) {
+      setFormError('Please select a next billing date.');
+      return;
+    }
 
     onSave({
       ...formData,
-      amount: parseFloat(formData.amount) || 0
+      name: formData.name.trim(),
+      amount: numAmount
     });
     onClose();
   };
@@ -87,6 +108,23 @@ export default function SubscriptionFormModal({
             <X size={20} />
           </button>
         </div>
+
+        {formError && (
+          <div 
+            style={{ 
+              background: 'var(--accent-red-bg)', 
+              color: '#B91C1C', 
+              padding: '0.65rem 1rem', 
+              borderRadius: 'var(--radius-md)', 
+              fontSize: '0.85rem',
+              fontWeight: '600',
+              marginBottom: '1rem',
+              border: '1px solid rgba(239, 68, 68, 0.3)'
+            }}
+          >
+            {formError}
+          </div>
+        )}
 
         {/* Popular Presets Bar (only on new) */}
         {!editingSubscription && (

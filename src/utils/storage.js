@@ -1,4 +1,4 @@
-import { SAMPLE_SUBSCRIPTIONS, CURRENCIES, BILLING_CYCLES } from '../constants';
+import { SAMPLE_SUBSCRIPTIONS, CURRENCIES, BILLING_CYCLES } from '../constants.js';
 
 const STORAGE_KEY = 'subsync_subscriptions_v1';
 const PREFS_KEY = 'subsync_user_prefs_v1';

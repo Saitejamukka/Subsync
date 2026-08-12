@@ -43,8 +43,22 @@ router.post('/', async (req, res) => {
       color
     } = req.body;
 
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Subscription name is required.' });
+    }
+
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({ error: 'Subscription amount must be a positive number greater than 0.' });
+    }
+
+    if (!nextBillingDate) {
+      return res.status(400).json({ error: 'Next billing date is required.' });
+    }
+
     const subId = id || `sub-${Date.now()}`;
-    const createdAt = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const createdAt = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     const sql = `
       INSERT INTO subscriptions 
@@ -55,9 +69,9 @@ router.post('/', async (req, res) => {
     await run(sql, [
       subId,
       userId,
-      name,
+      name.trim(),
       category || 'other',
-      parseFloat(amount) || 0,
+      parsedAmount,
       currency || 'USD',
       billingCycle || 'monthly',
       nextBillingDate,
@@ -97,6 +111,15 @@ router.put('/:id', async (req, res) => {
       color
     } = req.body;
 
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Subscription name is required.' });
+    }
+
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({ error: 'Subscription amount must be a positive number greater than 0.' });
+    }
+
     const sql = `
       UPDATE subscriptions SET
         name = ?, category = ?, amount = ?, currency = ?, billingCycle = ?,
@@ -106,9 +129,9 @@ router.put('/:id', async (req, res) => {
     `;
 
     await run(sql, [
-      name,
+      name.trim(),
       category,
-      parseFloat(amount),
+      parsedAmount,
       currency,
       billingCycle,
       nextBillingDate,
@@ -151,14 +174,18 @@ router.post('/:id/mark-paid', async (req, res) => {
     if (existing.length === 0) return res.status(404).json({ error: 'Subscription not found' });
 
     const sub = existing[0];
-    const d = new Date(sub.nextBillingDate + 'T00:00:00');
+    const parts = sub.nextBillingDate.split('-');
+    const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
 
     if (sub.billingCycle === 'yearly') d.setFullYear(d.getFullYear() + 1);
     else if (sub.billingCycle === 'quarterly') d.setMonth(d.getMonth() + 3);
     else if (sub.billingCycle === 'weekly') d.setDate(d.getDate() + 7);
     else d.setMonth(d.getMonth() + 1);
 
-    const nextStr = d.toISOString().split('T')[0];
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const nextStr = `${year}-${month}-${day}`;
 
     await run('UPDATE subscriptions SET nextBillingDate = ? WHERE id = ?', [nextStr, id]);
     const updated = await query('SELECT * FROM subscriptions WHERE id = ?', [id]);
