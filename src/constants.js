@@ -1,11 +1,11 @@
 export const CATEGORIES = [
-  { id: 'entertainment', name: 'Entertainment & Streaming', color: '#10B981', bg: '#D1FAE5', icon: 'Tv' },
-  { id: 'productivity', name: 'Productivity & AI', color: '#059669', bg: '#A7F3D0', icon: 'Cpu' },
-  { id: 'utilities', name: 'Cloud & Utilities', color: '#0284C7', bg: '#E0F2FE', icon: 'Cloud' },
-  { id: 'fitness', name: 'Health & Fitness', color: '#16A34A', bg: '#DCFCE7', icon: 'Activity' },
-  { id: 'finance', name: 'Finance & Legal', color: '#D97706', bg: '#FEF3C7', icon: 'DollarSign' },
-  { id: 'gaming', name: 'Gaming', color: '#DB2777', bg: '#FCE7F3', icon: 'Gamepad2' },
-  { id: 'other', name: 'Other', color: '#4B5563', bg: '#F3F4F6', icon: 'Box' },
+  { id: 'entertainment', name: 'Entertainment & Streaming', color: '#00CEC9', bg: 'rgba(0, 206, 201, 0.15)', icon: 'Tv' },
+  { id: 'productivity', name: 'Productivity & AI', color: '#0984E3', bg: 'rgba(9, 132, 227, 0.15)', icon: 'Cpu' },
+  { id: 'utilities', name: 'Cloud & Utilities', color: '#74B9FF', bg: 'rgba(116, 185, 255, 0.15)', icon: 'Cloud' },
+  { id: 'fitness', name: 'Health & Fitness', color: '#55E6C1', bg: 'rgba(85, 230, 193, 0.15)', icon: 'Activity' },
+  { id: 'finance', name: 'Finance & Legal', color: '#F1C40F', bg: 'rgba(241, 196, 15, 0.15)', icon: 'DollarSign' },
+  { id: 'gaming', name: 'Gaming', color: '#A29BFE', bg: 'rgba(162, 155, 254, 0.15)', icon: 'Gamepad2' },
+  { id: 'other', name: 'Other', color: '#A4B0BE', bg: 'rgba(164, 176, 190, 0.15)', icon: 'Box' },
 ];
 
 export const CURRENCIES = {
