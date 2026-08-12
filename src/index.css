@@ -237,7 +237,7 @@ body {
 
 /* Streamlined Top Spend Summary Hero Card */
 .spend-hero {
-  background: linear-gradient(135deg, #059669, #10B981);
+  background: linear-gradient(135deg, #065F46, #10B981);
   color: white;
   border-radius: var(--radius-lg);
   padding: 1.75rem 2rem;
