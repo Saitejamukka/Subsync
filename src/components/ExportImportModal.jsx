@@ -31,8 +31,40 @@ export default function ExportImportModal({
         try {
           const parsed = JSON.parse(event.target.result);
           if (Array.isArray(parsed)) {
-            onImport(parsed);
-            alert(`Successfully restored ${parsed.length} subscriptions!`);
+            if (parsed.length === 0) {
+              alert("Import failed: JSON file contains an empty array.");
+              return;
+            }
+
+            // Sanitize & validate each item in the array
+            const sanitized = parsed.map((item, idx) => {
+              if (!item || typeof item !== 'object') return null;
+              const numAmount = parseFloat(item.amount);
+              return {
+                id: item.id || `restored-${Date.now()}-${idx}`,
+                name: (item.name && String(item.name).trim()) || `Restored Subscription ${idx + 1}`,
+                category: item.category || 'other',
+                amount: (!isNaN(numAmount) && numAmount > 0) ? numAmount : 9.99,
+                currency: item.currency || 'USD',
+                billingCycle: item.billingCycle || 'monthly',
+                nextBillingDate: item.nextBillingDate || new Date().toISOString().split('T')[0],
+                autoRenew: item.autoRenew !== undefined ? Boolean(item.autoRenew) : true,
+                status: ['active', 'paused', 'cancelled'].includes(item.status) ? item.status : 'active',
+                paymentMethod: item.paymentMethod || 'Credit Card (Visa)',
+                reminderDays: parseInt(item.reminderDays) || 3,
+                notes: item.notes || '',
+                color: item.color || '#10B981',
+                createdAt: item.createdAt || new Date().toISOString().split('T')[0]
+              };
+            }).filter(Boolean);
+
+            if (sanitized.length === 0) {
+              alert("Import failed: No valid subscription objects found in file.");
+              return;
+            }
+
+            onImport(sanitized);
+            alert(`Successfully restored ${sanitized.length} valid subscriptions!`);
             onClose();
           } else {
             alert("Invalid JSON format. Expected an array of subscription objects.");

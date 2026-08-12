@@ -26,7 +26,7 @@ import InsightsRadar from './components/InsightsRadar';
 import NotificationCenter from './components/NotificationCenter';
 import EmailSimulatorModal from './components/EmailSimulatorModal';
 import ExportImportModal from './components/ExportImportModal';
-import AuthModal from './components/AuthModal';
+import LoginPage from './components/LoginPage';
 
 // Constants & Storage
 import { CATEGORIES, CURRENCIES, SAMPLE_SUBSCRIPTIONS } from './constants';
@@ -73,12 +73,20 @@ export default function App() {
   const [showAdvancedTools, setShowAdvancedTools] = useState(false);
   const [advancedTab, setAdvancedTab] = useState('analytics');
 
+  const [isAuthChecked, setIsAuthChecked] = useState(false);
+
   // Initial Data & User Session Fetching
   const loadData = async () => {
-    const user = await fetchCurrentUser();
-    setCurrentUser(user);
-    const data = await fetchSubscriptions();
-    setSubscriptions(data);
+    try {
+      const user = await fetchCurrentUser();
+      setCurrentUser(user);
+      const data = await fetchSubscriptions();
+      setSubscriptions(data);
+    } catch (e) {
+      console.warn('Error fetching initial user session or subscriptions', e);
+    } finally {
+      setIsAuthChecked(true);
+    }
   };
 
   useEffect(() => {
@@ -147,12 +155,20 @@ export default function App() {
     } else {
       setSubscriptions(prev => prev.map(s => {
         if (s.id === subId) {
-          const d = new Date(s.nextBillingDate + 'T00:00:00');
+          const parts = (s.nextBillingDate || '').split('-');
+          const d = parts.length === 3 
+            ? new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+            : new Date();
+
           if (s.billingCycle === 'yearly') d.setFullYear(d.getFullYear() + 1);
           else if (s.billingCycle === 'quarterly') d.setMonth(d.getMonth() + 3);
           else if (s.billingCycle === 'weekly') d.setDate(d.getDate() + 7);
           else d.setMonth(d.getMonth() + 1);
-          return { ...s, nextBillingDate: d.toISOString().split('T')[0] };
+
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return { ...s, nextBillingDate: `${year}-${month}-${day}` };
         }
         return s;
       }));
@@ -169,6 +185,34 @@ export default function App() {
     setCurrentUser(null);
     loadData();
   };
+
+  // 1. Initial Loading Spinner
+  if (!isAuthChecked) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="brand-icon" style={{ margin: '0 auto 1rem auto', width: '56px', height: '56px' }}>
+            <Zap size={32} color="#FFFFFF" />
+          </div>
+          <h2 style={{ fontWeight: '800', color: 'var(--green-dark)', marginBottom: '0.25rem' }}>SubSync</h2>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Loading session & dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Gateway Auth Page when user is not logged in
+  if (!currentUser) {
+    return (
+      <LoginPage 
+        isOpen={true}
+        onAuthSuccess={(user) => {
+          setCurrentUser(user);
+          loadData();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="app-container">
@@ -434,7 +478,7 @@ export default function App() {
       </section>
 
       {/* Modals & Drawers */}
-      <AuthModal 
+      <LoginPage 
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         onAuthSuccess={(user) => {
